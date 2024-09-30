@@ -11,24 +11,27 @@
 # of this license document, but changing it is not allowed.
 
 # Define some things
+
+# Export bot token and chat id
+export chat_id="-1002138024433"
+export token="7034672132:AAHi8HPm41YxODjidVTjO0Wg7Nz9L18aMmk"
+
 # Kernel common
 export ARCH=arm64
-export localversion=-X1.6
 export LINKER="ld.lld"
+
 # Telegram API
 export SEND_TO_TG=1
-export chat_id=""
-export token=""
+
 # Telegram && Output
-export kver="Beta"
-export CODENAME="even"
-export DEVICE="Realme C25 and Narzo50A (${CODENAME})"
-export BUILDER="Rem01"
-export BUILD_HOST="DigitalOcean"
-export TIMESTAMP=$(date +"%Y%m%d")-$(date +"%H%M%S")
+export kver="KernelSU"
+export CODENAME="merlinx"
+export DEVICE="Redmi Note 9 (${CODENAME})"
+export BUILDER="äerichāndesu"
+export BUILD_HOST="noticesa"
+export TIMESTAMP=$(date +"%Y%m%d")
 export KBUILD_COMPILER_STRING=$(./clang/bin/clang -v 2>&1 | head -n 1 | sed 's/(https..*//' | sed 's/ version//')
-export FW="RUI2"
-export zipn="Liquid-${CODENAME}-${FW}-${TIMESTAMP}"
+export zipn="Fearless-${CODENAME}-${TIMESTAMP}"
 # Needed by script
 export PATH="${PWD}/clang/bin:${PATH}"
 PROCS=$(nproc --all)
@@ -61,25 +64,40 @@ fi
 
 # Check dependencies
 if ! hash make curl bc zip 2>/dev/null; then
-        echo -e "${RED}error:${NOCOLOR} Environment has missing dependencies"
-        echo "Install make, curl, bc, and zip !"
-        exit 127
+  echo -e "${RED}error:${NOCOLOR} Missing dependencies"
+  echo "Installing..."
+  sudo apt update
+  sudo apt install -y make curl bc zip
+  echo "Dependencies installed!"
+else
+  echo "All dependencies present."
 fi
 
+# Check clang
 if [ ! -d "${PWD}/clang" ]; then
-    echo -e "${RED}error:${NOCOLOR} /clang not found!"
-    echo "have you clone the clang?"
-    exit 2
+  echo "Cloning clang..."
+  wget "https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20240925-release/Clang-20.0.0git-20240925.tar.gz" -O "clang.tar.gz"
+  rm -rf clang && mkdir clang && tar -xvf clang.tar.gz -C clang && rm -rf clang.tar.gz
+  echo "clang cloned!"
+else
+  echo "clang folder exists."
 fi
 
-
+# Check anykernel
 if [ ! -d "${PWD}/anykernel" ]; then
     echo -e "${RED}error:${NOCOLOR} /anykernel not found!"
-    echo "have you clone the anykernel?"
-    exit 2
+    echo "Cloning AnyKernel3..."
+    git clone -b Fearless https://github.com/noticesax/AnyKernel3 anykernel
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}error:${NOCOLOR} Failed to clone!"
+        exit 1
+    fi
+    echo "Cloned AnyKernel3!"
+else
+    echo "anykernel directory exists."
 fi
 
-# Exit while got interrupt signal
+# Exit on interrupt
 exit_on_signal_interrupt() {
     echo -e "\n\n${RED}Got interrupt signal.${NOCOLOR}"
     exit 130
@@ -87,7 +105,7 @@ exit_on_signal_interrupt() {
 trap exit_on_signal_interrupt SIGINT
 
 help_msg() {
-    echo "Usage: bash origami_kernel_builder.sh --choose=[Function]"
+    echo "Usage: bash build.sh --choose=[Function]"
     echo ""
     echo "Some functions on Origami Kernel Builder:"
     echo "1. Build a whole Kernel"
@@ -99,51 +117,52 @@ help_msg() {
 }
 
 send_msg_telegram() {
-    case "$1" in
-    1) curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
-                -d chat_id="$chat_id" \
-                -d "disable_web_page_preview=true" \
-                -d "parse_mode=html" \
-                -d text="<b>~~~ ORIGAMI CI ~~~</b>
-<b>Build Started on ${BUILD_HOST}</b>
-<b>Build status</b>: <code>${kver}</code>
-<b>Builder</b>: <code>${BUILDER}</code>
-<b>Device</b>: <code>${DEVICE}</code>
-<b>Kernel Version</b>: <code>$(make kernelversion 2>/dev/null)</code>
-<b>Date</b>: <code>$(date)</code>
-<b>Zip Name</b>: <code>${zipn}</code>
-<b>Defconfig</b>: <code>${DEFCONFIG}</code>
-<b>Compiler</b>: <code>${KBUILD_COMPILER_STRING}</code>
-<b>Branch</b>: <code>$(git rev-parse --abbrev-ref HEAD)</code>
-<b>Last Commit</b>: <code>$(git log --format="%s" -n 1): $(git log --format="%h" -n 1)</code>" \
-                -o /dev/null
-        ;;
-    2) curl -s -F document=@./out/build.log "https://api.telegram.org/bot$token/sendDocument" \
-                -F chat_id="$chat_id" \
-                -F "disable_web_page_preview=true" \
-                -F "parse_mode=html" \
-                -F caption="Build failed after ${minutes} minutes and ${seconds} seconds." \
-                -o /dev/null \
-                -w "" >/dev/null 2>&1
-        ;;
-    3) curl -s -F document=@./out/target/"${zipn}".zip "https://api.telegram.org/bot$token/sendDocument" \
-                -F chat_id="$chat_id" \
-                -F "disable_web_page_preview=true" \
-                -F "parse_mode=html" \
-                -F caption="Build took ${minutes} minutes and ${seconds} seconds.
-<b>SHA512</b>: <code>${checksum}</code>" \
-                -o /dev/null \
-                -w "" >/dev/null 2>&1
-
-        curl -s -F document=@./out/build.log "https://api.telegram.org/bot$token/sendDocument" \
-                -F chat_id="$chat_id" \
-                -F "disable_web_page_preview=true" \
-                -F "parse_mode=html" \
-                -F caption="Build log" \
-                -o /dev/null \
-                -w "" >/dev/null 2>&1
-        ;;
-    esac
+  case "$1" in
+    1)
+      curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
+        -d chat_id="$chat_id" \
+        -d "disable_web_page_preview=true" \
+        -d "parse_mode=html" \
+        -d text="<b>——${TIMESTAMP}——</b>
+<b>*Build Triggered ${BUILD_HOST}</b>
+<b>*Build status</b>: <code>${kver}</code>
+<b>*Builder</b>: <code>${BUILDER}</code>
+<b>*Device</b>: <code>${DEVICE}</code>
+<b>*Kernel Ver</b>: <code>$(make kernelversion 2>/dev/null)</code>
+<b>*Date</b>: <code>$(date)</code>
+<b>*Zip</b>: <code>${zipn}</code>
+<b>*Defconfig</b>: <code>${DEFCONFIG}</code>
+<b>*Clang Ver</b>: <code>${KBUILD_COMPILER_STRING}</code>
+<b>*Branch</b>: <code>$(git rev-parse --abbrev-ref HEAD)</code>
+<b>*Head</b>: <code>$(git log --format="%h" -n 1)</code>" \
+        -o /dev/null
+      ;;
+    2)
+      curl -s -F document=@./out/build.log "https://api.telegram.org/bot$token/sendDocument" \
+        -F chat_id="$chat_id" \
+        -F "disable_web_page_preview=true" \
+        -F "parse_mode=html" \
+        -F caption="Build failed after ${minutes} minutes and ${seconds} seconds." \
+        -o /dev/null \
+        -w "" >/dev/null 2>&1
+      ;;
+    3)
+      curl -s -F document=@./out/target/"${zipn}".zip "https://api.telegram.org/bot$token/sendDocument" \
+        -F chat_id="$chat_id" \
+        -F "disable_web_page_preview=true" \
+        -F "parse_mode=html" \
+        -F caption="Build Succes! - Duration: ${minutes}min & ${seconds}secs." \
+        -o /dev/null \
+        -w "" >/dev/null 2>&1
+      curl -s -F document=@./out/build.log "https://api.telegram.org/bot$token/sendDocument" \
+        -F chat_id="$chat_id" \
+        -F "disable_web_page_preview=true" \
+        -F "parse_mode=html" \
+        -F caption="Build log" \
+        -o /dev/null \
+        -w "" >/dev/null 2>&1
+      ;;
+  esac
 }
 
 show_defconfigs() {
@@ -184,6 +203,9 @@ compile_kernel() {
     export KBUILD_BUILD_USER=${BUILDER}
     export KBUILD_BUILD_HOST=${BUILD_HOST}
     export LOCALVERSION=${localversion}
+    export CROSS_COMPILE_ARM32="arm-linux-gnueabi-"
+    export CROSS_COMPILE_COMPAT="arm-linux-gnueabi-"
+    export CROSS_COMPILE="aarch64-linux-gnu-"
 
     make O=out ARCH=${ARCH} ${DEFCONFIG}
 
@@ -278,7 +300,6 @@ build_kernel() {
 
     echo -e "${LIGHTBLUE}================================="
     echo "Build took ${minutes} minutes and ${seconds} seconds."
-    echo "SHA512: ${checksum}"
     echo -e "=================================${NOCOLOR}"
 
     if [ "$SEND_TO_TG" -eq 1 ]; then
@@ -293,18 +314,14 @@ cp -rf ./out/.config ./arch/${ARCH}/configs/${DEFCONFIG}
 }
 
 open_menuconfig() {
-show_defconfigs
-make O=out ARCH=${ARCH} ${DEFCONFIG}
-echo -e "${LIGHTGREEN}Note: Make sure you save the config with name '.config'"
-echo -e "      else the defconfig will not saved automatically.${NOCOLOR}"
-local count=8
-while [ $count -gt 0 ]; do
-    echo -ne -e "${LIGHTCYAN}menuconfig will be opened in $count seconds... \r${NOCOLOR}"
-    sleep 1
-    ((count--))
-done
-make O=out menuconfig
-cp -rf ./out/.config ./arch/${ARCH}/configs/${DEFCONFIG}
+    show_defconfigs
+    make O=out ARCH=${ARCH} ${DEFCONFIG}
+    echo -e "${LIGHTGREEN}Note: Make sure you save the config with name '.config'"    
+    echo -e "      else the defconfig will not saved automatically.${NOCOLOR}"
+
+    # Removed the countdown loop
+    make O=out menuconfig
+    cp -rf ./out/.config ./arch/${ARCH}/configs/${DEFCONFIG}
 }
 
 execute_operation() {
