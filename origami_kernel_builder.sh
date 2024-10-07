@@ -12,9 +12,31 @@
 
 # Define some things
 
-# Export bot token and chat id
-export chat_id="-1002138024433"
-export token="7034672132:AAHi8HPm41YxODjidVTjO0Wg7Nz9L18aMmk"
+# Export Bot token and chat id
+export SEND_TO_TG=1
+export chat_id=""
+export token=""
+
+#!/bin/bash
+
+# Read bot token and chat ID from variables
+token="$token"
+chat_id="$chat_id"
+
+# Checking if environment variables are set
+if [ -z "$token" ] || [ -z "$chat_id" ]; then
+  echo "Error: Bot token or chat ID is not set."
+  exit 1
+fi
+
+# Sending messages using curl
+curl -s -X POST \
+  https://api.telegram.org/bot"$token"/sendMessage \
+  -d chat_id="$chat_id" \
+  -d text="compiler is standby, waiting the next command..." > /dev/null
+
+echo "Message has been sent to Telegram."
+
 
 # Kernel common
 export ARCH=arm64
@@ -73,15 +95,23 @@ else
   echo "All dependencies present."
 fi
 
-# Check clang
+# Check if clang folder exists
 if [ ! -d "${PWD}/clang" ]; then
   echo "Cloning clang..."
-  wget "https://github.com/ZyCromerZ/Clang/releases/download/20.0.0git-20240925-release/Clang-20.0.0git-20240925.tar.gz" -O "clang.tar.gz"
+
+  # Get the latest release URL
+  latest_release_url=$(curl -s "https://api.github.com/repos/ZyCromerZ/Clang/releases/latest" | grep '"browser_download_url":' | cut -d '"' -f 4)
+
+  # Download the latest release assets
+  wget "$latest_release_url" -O "clang.tar.gz"
+
+  # Extract archive and clean it
   rm -rf clang && mkdir clang && tar -xvf clang.tar.gz -C clang && rm -rf clang.tar.gz
   echo "clang cloned!"
 else
-  echo "clang folder exists."
+  echo "The clang folder already exists."
 fi
+
 
 # Check anykernel
 if [ ! -d "${PWD}/anykernel" ]; then
@@ -119,12 +149,20 @@ help_msg() {
 send_msg_telegram() {
   case "$1" in
     1)
+      # Dapatkan URL repositori
+      repo_url=$(git config --get remote.origin.url)
+      # Dapatkan hash commit terakhir
+      commit_hash=$(git log --format="%h" -n 1)
+      # Buat URL commit
+      commit_url="${repo_url}/commit/${commit_hash}"
+
       curl -s -X POST "https://api.telegram.org/bot$token/sendMessage" \
         -d chat_id="$chat_id" \
         -d "disable_web_page_preview=true" \
         -d "parse_mode=html" \
         -d text="<b>——${TIMESTAMP}——</b>
 <b>*Build Triggered ${BUILD_HOST}</b>
+<b>*Local Ver</b>: <code>TC/UDC</code>
 <b>*Build status</b>: <code>${kver}</code>
 <b>*Builder</b>: <code>${BUILDER}</code>
 <b>*Device</b>: <code>${DEVICE}</code>
@@ -134,7 +172,7 @@ send_msg_telegram() {
 <b>*Defconfig</b>: <code>${DEFCONFIG}</code>
 <b>*Clang Ver</b>: <code>${KBUILD_COMPILER_STRING}</code>
 <b>*Branch</b>: <code>$(git rev-parse --abbrev-ref HEAD)</code>
-<b>*Head</b>: <code>$(git log --format="%h" -n 1)</code>" \
+<b>*Last Commit</b>: <a href=\"${commit_url}\">${commit_hash}</a>" \
         -o /dev/null
       ;;
     2)
@@ -151,7 +189,7 @@ send_msg_telegram() {
         -F chat_id="$chat_id" \
         -F "disable_web_page_preview=true" \
         -F "parse_mode=html" \
-        -F caption="Build Succes! - Duration: ${minutes}min & ${seconds}secs." \
+        -F caption="Fearless Build Succes: ${minutes}min & ${seconds}secs." \
         -o /dev/null \
         -w "" >/dev/null 2>&1
       curl -s -F document=@./out/build.log "https://api.telegram.org/bot$token/sendDocument" \
@@ -164,6 +202,7 @@ send_msg_telegram() {
       ;;
   esac
 }
+
 
 show_defconfigs() {
     defconfig_path="./arch/${ARCH}/configs"
