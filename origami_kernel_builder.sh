@@ -46,9 +46,9 @@ export LINKER="ld.lld"
 export SEND_TO_TG=1
 
 # Telegram && Output
-export kver="KernelSU"
-export CODENAME="merlinx"
-export DEVICE="Redmi Note 9 (${CODENAME})"
+export kver="Beta"
+export CODENAME="fire"
+export DEVICE="Redmi 12 (${CODENAME})"
 export BUILDER="äerichāndesu"
 export BUILD_HOST="noticesa"
 export TIMESTAMP=$(date +"%Y%m%d")
