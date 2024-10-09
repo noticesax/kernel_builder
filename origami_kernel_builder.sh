@@ -29,15 +29,6 @@ if [ -z "$token" ] || [ -z "$chat_id" ]; then
   exit 1
 fi
 
-# Sending messages using curl
-curl -s -X POST \
-  https://api.telegram.org/bot"$token"/sendMessage \
-  -d chat_id="$chat_id" \
-  -d text="compiler is standby, waiting the next command..." > /dev/null
-
-echo "Message has been sent to Telegram."
-
-
 # Kernel common
 export ARCH=arm64
 export LINKER="ld.lld"
@@ -47,8 +38,8 @@ export SEND_TO_TG=1
 
 # Telegram && Output
 export kver="Beta"
-export CODENAME="fire"
-export DEVICE="Redmi 12 (${CODENAME})"
+export CODENAME="merlinx"
+export DEVICE="Redmi Note 9 (${CODENAME})"
 export BUILDER="äerichāndesu"
 export BUILD_HOST="noticesa"
 export TIMESTAMP=$(date +"%Y%m%d")
