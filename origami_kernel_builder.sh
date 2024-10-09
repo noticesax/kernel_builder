@@ -108,7 +108,7 @@ fi
 if [ ! -d "${PWD}/anykernel" ]; then
     echo -e "${RED}error:${NOCOLOR} /anykernel not found!"
     echo "Cloning AnyKernel3..."
-    git clone -b Fearless https://github.com/noticesax/AnyKernel3 anykernel
+    git clone -b fire https://github.com/Le-Mineral-0023/Anykernel3-FIRE anykernel
     if [ $? -ne 0 ]; then
         echo -e "${RED}error:${NOCOLOR} Failed to clone!"
         exit 1
